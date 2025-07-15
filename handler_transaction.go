@@ -55,7 +55,7 @@ func (apiCFG *apiConfig) handlerMakeTransaction(w http.ResponseWriter, r *http.R
 	}
 
 	if amount.GreaterThan(balance) {
-		respondWithError(w, 400, fmt.Sprintf("Not enough money: balance is %v, your amount %v", balance, amount))
+		respondWithError(w, 409, fmt.Sprintf("Not enough money: balance is %v, your amount %v", balance, amount))
 		return
 	}
 
@@ -73,12 +73,13 @@ func (apiCFG *apiConfig) handlerMakeTransaction(w http.ResponseWriter, r *http.R
 
 	senderNewBalance := balance.Sub(amount)
 	recieverNewBalance := recieverBalance.Add(amount)
+
 	_, err = apiCFG.DB.ChangeWalletBalance(r.Context(), database.ChangeWalletBalanceParams{
 		Balance: senderNewBalance.String(),
 		Address: params.From,
 	})
 	if err != nil {
-		respondWithError(w, 400, fmt.Sprintf("Error changing sender balance: %v", err))
+		respondWithError(w, 500, fmt.Sprintf("Error changing sender balance: %v", err))
 		return
 	}
 	_, err = apiCFG.DB.ChangeWalletBalance(r.Context(), database.ChangeWalletBalanceParams{
@@ -86,7 +87,7 @@ func (apiCFG *apiConfig) handlerMakeTransaction(w http.ResponseWriter, r *http.R
 		Address: params.To,
 	})
 	if err != nil {
-		respondWithError(w, 400, fmt.Sprintf("Error changing reciever balance: %v", err))
+		respondWithError(w, 500, fmt.Sprintf("Error changing reciever balance: %v", err))
 		return
 	}
 
@@ -98,7 +99,7 @@ func (apiCFG *apiConfig) handlerMakeTransaction(w http.ResponseWriter, r *http.R
 		RecipientAddress: params.To,
 	})
 	if err != nil {
-		respondWithError(w, 400, fmt.Sprintf("Error creating transaction: %v", err))
+		respondWithError(w, 500, fmt.Sprintf("Error creating transaction: %v", err))
 		return
 	}
 
@@ -114,7 +115,7 @@ func (apiCFG *apiConfig) handlerGetNLastTransactions(w http.ResponseWriter, r *h
 	}
 	transactions, err := apiCFG.DB.GetNLastTransactions(r.Context(), int32(count))
 	if err != nil {
-		respondWithError(w, 400, fmt.Sprintf("Error getting transactions: %v", err))
+		respondWithError(w, 500, fmt.Sprintf("Error getting transactions: %v", err))
 		return
 	}
 
