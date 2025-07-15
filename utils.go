@@ -9,7 +9,7 @@ import (
 )
 
 // checkWallets generates 10 wallets
-// with 100 on balance if db is empty
+// with 100 on balance if db`s table wallets is empty
 func checkWallets(apiCFG apiConfig) {
 	if wallets, _ := apiCFG.DB.GetWallets(context.Background()); len(wallets) == 0 {
 		for i := 0; i < 10; i++ {

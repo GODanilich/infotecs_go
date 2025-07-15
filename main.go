@@ -11,16 +11,31 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
 	"github.com/joho/godotenv"
+	"github.com/shopspring/decimal"
 
 	_ "github.com/lib/pq"
 )
 
 type apiConfig struct {
-	DB *database.Queries
+	DB                       *database.Queries
+	dbConn                   *sql.DB
+	minimalTransactionAmount decimal.Decimal
 }
 
 func main() {
 	godotenv.Load(".env")
+
+	minimalTransactionAmountString := os.Getenv("MINIMAL_TRANSACTION_AMOUNT")
+	if minimalTransactionAmountString == "" {
+		log.Fatal("MINIMAL_TRANSACTION_AMOUNT is not found in the environment")
+	}
+
+	minimumTransactionAmount, err := decimal.NewFromString(minimalTransactionAmountString)
+	if err != nil {
+		panic(err)
+	}
+
+	log.Printf("MINIMAL_TRANSACTION_AMOUNT is %v\n\n", minimumTransactionAmount)
 
 	portString := os.Getenv("PORT")
 	if portString == "" {
@@ -42,7 +57,9 @@ func main() {
 	db := database.New(conn)
 
 	apiCFG := apiConfig{
-		DB: db,
+		DB:                       db,
+		dbConn:                   conn,
+		minimalTransactionAmount: minimumTransactionAmount,
 	}
 
 	router := chi.NewRouter()
@@ -62,7 +79,7 @@ func main() {
 		respondWithJSON(w, 200, "hello world")
 	})
 	v1Router.Get("/api/wallet/{address}/balance", apiCFG.handlerGetBalance)
-	v1Router.Put("/api/send", apiCFG.handlerMakeTransaction)
+	v1Router.Post("/api/send", apiCFG.handlerMakeTransaction)
 	v1Router.Get("/api/transactions", apiCFG.handlerGetNLastTransactions)
 
 	router.Mount("/v1", v1Router)

@@ -13,11 +13,6 @@ import (
 )
 
 func (apiCFG *apiConfig) handlerMakeTransaction(w http.ResponseWriter, r *http.Request) {
-
-	minimumTransactionAmount, err := decimal.NewFromString("0.01")
-	if err != nil {
-		panic(err)
-	}
 	type parameters struct {
 		From   uuid.UUID `json:"from"`
 		To     uuid.UUID `json:"to"`
@@ -26,21 +21,33 @@ func (apiCFG *apiConfig) handlerMakeTransaction(w http.ResponseWriter, r *http.R
 
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
-	err = decoder.Decode(&params)
+	err := decoder.Decode(&params)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Error parsing JSON: %v", err))
 		return
 	}
 
-	balanceStr, err := apiCFG.DB.GetWalletBalance(r.Context(), params.From)
-	if err != nil {
-		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Couldn`t find wallet: %v", err))
+	// check if sender address == recipient address
+	if params.From == params.To {
+		respondWithError(w, http.StatusBadRequest, "Sender and recipient addresses can`t be the same")
 		return
 	}
 
+	// check if amount < minimalTransactionAmount
 	amount, err := decimal.NewFromString(params.Amount)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Error parsing amount: %v", err))
+		return
+	}
+	if amount.LessThan(apiCFG.minimalTransactionAmount) {
+		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Amout value is too small: minimum value is %v, your amount %v", apiCFG.minimalTransactionAmount, amount))
+		return
+	}
+
+	// check if sender balance < amount
+	balanceStr, err := apiCFG.DB.GetWalletBalance(r.Context(), params.From)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Couldn`t find wallet: %v", err))
 		return
 	}
 	balance, err := decimal.NewFromString(balanceStr)
@@ -48,33 +55,38 @@ func (apiCFG *apiConfig) handlerMakeTransaction(w http.ResponseWriter, r *http.R
 		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Error parsing balance: %v", err))
 		return
 	}
-
-	if amount.LessThan(minimumTransactionAmount) {
-		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Amout value is too small: minimum value is %v, your amount %v", minimumTransactionAmount, amount))
-		return
-	}
-
 	if amount.GreaterThan(balance) {
 		respondWithError(w, http.StatusConflict, fmt.Sprintf("Not enough money: balance is %v, your amount %v", balance, amount))
 		return
 	}
 
-	recieverBalanceStr, err := apiCFG.DB.GetWalletBalance(r.Context(), params.To)
+	// getting recipient balance
+	recipientBalanceStr, err := apiCFG.DB.GetWalletBalance(r.Context(), params.To)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Couldn`t find wallet: %v", err))
 		return
 	}
 
-	recieverBalance, err := decimal.NewFromString(recieverBalanceStr)
+	recipientBalance, err := decimal.NewFromString(recipientBalanceStr)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Error parsing balance: %v", err))
 		return
 	}
 
+	// new balance computations
 	senderNewBalance := balance.Sub(amount)
-	recieverNewBalance := recieverBalance.Add(amount)
+	recipientNewBalance := recipientBalance.Add(amount)
 
-	_, err = apiCFG.DB.ChangeWalletBalance(r.Context(), database.ChangeWalletBalanceParams{
+	// changing sender, recipient balance and creating transaction as atomic operation
+	tx, err := apiCFG.dbConn.BeginTx(r.Context(), nil)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to begin transaction")
+		return
+	}
+
+	defer tx.Rollback()
+
+	_, err = apiCFG.DB.WithTx(tx).ChangeWalletBalance(r.Context(), database.ChangeWalletBalanceParams{
 		Balance: senderNewBalance.String(),
 		Address: params.From,
 	})
@@ -82,16 +94,17 @@ func (apiCFG *apiConfig) handlerMakeTransaction(w http.ResponseWriter, r *http.R
 		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error changing sender balance: %v", err))
 		return
 	}
-	_, err = apiCFG.DB.ChangeWalletBalance(r.Context(), database.ChangeWalletBalanceParams{
-		Balance: recieverNewBalance.String(),
+
+	_, err = apiCFG.DB.WithTx(tx).ChangeWalletBalance(r.Context(), database.ChangeWalletBalanceParams{
+		Balance: recipientNewBalance.String(),
 		Address: params.To,
 	})
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error changing reciever balance: %v", err))
+		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error changing receiver balance: %v", err))
 		return
 	}
 
-	transaction, err := apiCFG.DB.AddTransaction(r.Context(), database.AddTransactionParams{
+	transaction, err := apiCFG.DB.WithTx(tx).AddTransaction(r.Context(), database.AddTransactionParams{
 		ID:               uuid.New(),
 		ExecutedAt:       time.Now().UTC(),
 		Amount:           params.Amount,
@@ -103,7 +116,13 @@ func (apiCFG *apiConfig) handlerMakeTransaction(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, transaction)
+	if err := tx.Commit(); err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to commit transaction")
+		return
+	}
+
+	respondWithJSON(w, http.StatusCreated, transaction)
+
 }
 
 func (apiCFG *apiConfig) handlerGetNLastTransactions(w http.ResponseWriter, r *http.Request) {
