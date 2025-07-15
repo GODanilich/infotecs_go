@@ -28,46 +28,46 @@ func (apiCFG *apiConfig) handlerMakeTransaction(w http.ResponseWriter, r *http.R
 	params := parameters{}
 	err = decoder.Decode(&params)
 	if err != nil {
-		respondWithError(w, 400, fmt.Sprintf("Error parsing JSON: %v", err))
+		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Error parsing JSON: %v", err))
 		return
 	}
 
 	balanceStr, err := apiCFG.DB.GetWalletBalance(r.Context(), params.From)
 	if err != nil {
-		respondWithError(w, 400, fmt.Sprintf("Couldn`t find wallet: %v", err))
+		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Couldn`t find wallet: %v", err))
 		return
 	}
 
 	amount, err := decimal.NewFromString(params.Amount)
 	if err != nil {
-		respondWithError(w, 400, fmt.Sprintf("Error parsing amount: %v", err))
+		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Error parsing amount: %v", err))
 		return
 	}
 	balance, err := decimal.NewFromString(balanceStr)
 	if err != nil {
-		respondWithError(w, 400, fmt.Sprintf("Error parsing balance: %v", err))
+		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Error parsing balance: %v", err))
 		return
 	}
 
 	if amount.LessThan(minimumTransactionAmount) {
-		respondWithError(w, 400, fmt.Sprintf("Amout value is too small: minimum value is %v, your amount %v", minimumTransactionAmount, amount))
+		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Amout value is too small: minimum value is %v, your amount %v", minimumTransactionAmount, amount))
 		return
 	}
 
 	if amount.GreaterThan(balance) {
-		respondWithError(w, 409, fmt.Sprintf("Not enough money: balance is %v, your amount %v", balance, amount))
+		respondWithError(w, http.StatusConflict, fmt.Sprintf("Not enough money: balance is %v, your amount %v", balance, amount))
 		return
 	}
 
 	recieverBalanceStr, err := apiCFG.DB.GetWalletBalance(r.Context(), params.To)
 	if err != nil {
-		respondWithError(w, 400, fmt.Sprintf("Couldn`t find wallet: %v", err))
+		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Couldn`t find wallet: %v", err))
 		return
 	}
 
 	recieverBalance, err := decimal.NewFromString(recieverBalanceStr)
 	if err != nil {
-		respondWithError(w, 400, fmt.Sprintf("Error parsing balance: %v", err))
+		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Error parsing balance: %v", err))
 		return
 	}
 
@@ -79,7 +79,7 @@ func (apiCFG *apiConfig) handlerMakeTransaction(w http.ResponseWriter, r *http.R
 		Address: params.From,
 	})
 	if err != nil {
-		respondWithError(w, 500, fmt.Sprintf("Error changing sender balance: %v", err))
+		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error changing sender balance: %v", err))
 		return
 	}
 	_, err = apiCFG.DB.ChangeWalletBalance(r.Context(), database.ChangeWalletBalanceParams{
@@ -87,7 +87,7 @@ func (apiCFG *apiConfig) handlerMakeTransaction(w http.ResponseWriter, r *http.R
 		Address: params.To,
 	})
 	if err != nil {
-		respondWithError(w, 500, fmt.Sprintf("Error changing reciever balance: %v", err))
+		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error changing reciever balance: %v", err))
 		return
 	}
 
@@ -99,25 +99,25 @@ func (apiCFG *apiConfig) handlerMakeTransaction(w http.ResponseWriter, r *http.R
 		RecipientAddress: params.To,
 	})
 	if err != nil {
-		respondWithError(w, 500, fmt.Sprintf("Error creating transaction: %v", err))
+		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error creating transaction: %v", err))
 		return
 	}
 
-	respondWithJSON(w, 200, transaction)
+	respondWithJSON(w, http.StatusOK, transaction)
 }
 
 func (apiCFG *apiConfig) handlerGetNLastTransactions(w http.ResponseWriter, r *http.Request) {
 	countStr := r.URL.Query().Get("count")
 	count, err := strconv.Atoi(countStr)
 	if err != nil {
-		respondWithError(w, 400, fmt.Sprintf("Error converting count: %v", err))
+		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Error converting count: %v", err))
 		return
 	}
 	transactions, err := apiCFG.DB.GetNLastTransactions(r.Context(), int32(count))
 	if err != nil {
-		respondWithError(w, 500, fmt.Sprintf("Error getting transactions: %v", err))
+		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting transactions: %v", err))
 		return
 	}
 
-	respondWithJSON(w, 200, transactions)
+	respondWithJSON(w, http.StatusOK, transactions)
 }

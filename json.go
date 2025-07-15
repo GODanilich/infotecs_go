@@ -19,13 +19,13 @@ func respondWithError(w http.ResponseWriter, code int, msg string) {
 }
 
 func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
-	dat, err := json.Marshal(payload)
-	if err != nil {
-		log.Printf("Failed to marshal JSON response: %v", payload)
-		w.WriteHeader(500)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+
+	encoder := json.NewEncoder(w)
+	if err := encoder.Encode(payload); err != nil {
+		log.Printf("Failed to encode JSON response: %v, payload: %v", err, payload)
+		http.Error(w, `{"error": "Internal server error"}`, http.StatusInternalServerError)
 		return
 	}
-	w.Header().Add("Content-Type", "application/json")
-	w.WriteHeader(code)
-	w.Write(dat)
 }
