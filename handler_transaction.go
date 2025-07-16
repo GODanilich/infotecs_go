@@ -94,8 +94,9 @@ func (apiCFG *apiConfig) handlerMakeTransaction(w http.ResponseWriter, r *http.R
 
 	// changing sender balance
 	_, err = apiCFG.DB.WithTx(tx).ChangeWalletBalance(r.Context(), database.ChangeWalletBalanceParams{
-		Balance: senderNewBalance.String(),
-		Address: params.From,
+		Balance:   senderNewBalance.String(),
+		UpdatedAt: time.Now().UTC(),
+		Address:   params.From,
 	})
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error changing sender balance: %v", err))
@@ -104,8 +105,9 @@ func (apiCFG *apiConfig) handlerMakeTransaction(w http.ResponseWriter, r *http.R
 
 	// changing recipient balance
 	_, err = apiCFG.DB.WithTx(tx).ChangeWalletBalance(r.Context(), database.ChangeWalletBalanceParams{
-		Balance: recipientNewBalance.String(),
-		Address: params.To,
+		Balance:   recipientNewBalance.String(),
+		UpdatedAt: time.Now().UTC(),
+		Address:   params.To,
 	})
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error changing receiver balance: %v", err))

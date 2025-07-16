@@ -16,18 +16,19 @@ const changeWalletBalance = `-- name: ChangeWalletBalance :one
 UPDATE wallets
 SET
     balance = $1,
-    updated_at = NOW()
-WHERE address = $2
+    updated_at = $2
+WHERE address = $3
 RETURNING address, created_at, updated_at, balance
 `
 
 type ChangeWalletBalanceParams struct {
-	Balance string
-	Address uuid.UUID
+	Balance   string
+	UpdatedAt time.Time
+	Address   uuid.UUID
 }
 
 func (q *Queries) ChangeWalletBalance(ctx context.Context, arg ChangeWalletBalanceParams) (Wallet, error) {
-	row := q.db.QueryRowContext(ctx, changeWalletBalance, arg.Balance, arg.Address)
+	row := q.db.QueryRowContext(ctx, changeWalletBalance, arg.Balance, arg.UpdatedAt, arg.Address)
 	var i Wallet
 	err := row.Scan(
 		&i.Address,

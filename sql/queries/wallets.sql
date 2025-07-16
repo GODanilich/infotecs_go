@@ -16,6 +16,6 @@ SELECT balance FROM wallets WHERE address = $1;
 UPDATE wallets
 SET
     balance = $1,
-    updated_at = NOW()
-WHERE address = $2
+    updated_at = $2
+WHERE address = $3
 RETURNING *;
