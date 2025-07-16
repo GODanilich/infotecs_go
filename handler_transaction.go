@@ -12,13 +12,17 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// handlerMakeTransaction handles a POST api/send endpoint
 func (apiCFG *apiConfig) handlerMakeTransaction(w http.ResponseWriter, r *http.Request) {
+
+	// parameters of JSON request body
 	type parameters struct {
 		From   uuid.UUID `json:"from"`
 		To     uuid.UUID `json:"to"`
 		Amount string    `json:"amount"`
 	}
 
+	// decoding JSON request body into params
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
 	err := decoder.Decode(&params)
@@ -40,7 +44,9 @@ func (apiCFG *apiConfig) handlerMakeTransaction(w http.ResponseWriter, r *http.R
 		return
 	}
 	if amount.LessThan(apiCFG.minimalTransactionAmount) {
-		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Amout value is too small: minimum value is %v, your amount %v", apiCFG.minimalTransactionAmount, amount))
+		respondWithError(w, http.StatusBadRequest,
+			fmt.Sprintf("Amout value is too small: minimum value is %v, your amount %v", apiCFG.minimalTransactionAmount, amount),
+		)
 		return
 	}
 
@@ -77,7 +83,7 @@ func (apiCFG *apiConfig) handlerMakeTransaction(w http.ResponseWriter, r *http.R
 	senderNewBalance := balance.Sub(amount)
 	recipientNewBalance := recipientBalance.Add(amount)
 
-	// changing sender, recipient balance and creating transaction as atomic operation
+	// making db transactions as atomic operation
 	tx, err := apiCFG.dbConn.BeginTx(r.Context(), nil)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to begin transaction")
@@ -86,6 +92,7 @@ func (apiCFG *apiConfig) handlerMakeTransaction(w http.ResponseWriter, r *http.R
 
 	defer tx.Rollback()
 
+	// changing sender balance
 	_, err = apiCFG.DB.WithTx(tx).ChangeWalletBalance(r.Context(), database.ChangeWalletBalanceParams{
 		Balance: senderNewBalance.String(),
 		Address: params.From,
@@ -95,6 +102,7 @@ func (apiCFG *apiConfig) handlerMakeTransaction(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	// changing recipient balance
 	_, err = apiCFG.DB.WithTx(tx).ChangeWalletBalance(r.Context(), database.ChangeWalletBalanceParams{
 		Balance: recipientNewBalance.String(),
 		Address: params.To,
@@ -104,6 +112,7 @@ func (apiCFG *apiConfig) handlerMakeTransaction(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	// creating transaction in db`s transactions table
 	transaction, err := apiCFG.DB.WithTx(tx).AddTransaction(r.Context(), database.AddTransactionParams{
 		ID:               uuid.New(),
 		ExecutedAt:       time.Now().UTC(),
@@ -116,6 +125,7 @@ func (apiCFG *apiConfig) handlerMakeTransaction(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	// Commiting transaction
 	if err := tx.Commit(); err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to commit transaction")
 		return
@@ -125,7 +135,9 @@ func (apiCFG *apiConfig) handlerMakeTransaction(w http.ResponseWriter, r *http.R
 
 }
 
+// handlerGetNLastTransactions handles a GET  /api/transactions?count=N endpoint
 func (apiCFG *apiConfig) handlerGetNLastTransactions(w http.ResponseWriter, r *http.Request) {
+	// parsing count from query string
 	countStr := r.URL.Query().Get("count")
 	count, err := strconv.Atoi(countStr)
 	if err != nil {

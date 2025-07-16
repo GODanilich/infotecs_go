@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// handlerGetBalance handles GET /api/wallet/{address}/balance endpoint
 func (apiCFG *apiConfig) handlerGetBalance(w http.ResponseWriter, r *http.Request) {
 	addressStr := chi.URLParam(r, "address")
 	address, err := uuid.Parse(addressStr)
