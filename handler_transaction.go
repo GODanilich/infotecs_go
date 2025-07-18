@@ -12,7 +12,9 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// handlerMakeTransaction handles a POST api/send endpoint
+// handlerMakeTransaction handles a POST api/send endpoint.
+// Takes json with fields "from", "to", "amount" as a request body
+// and returns json representation of created transaction in response
 func (apiCFG *apiConfig) handlerMakeTransaction(w http.ResponseWriter, r *http.Request) {
 
 	// parameters of JSON request body
@@ -133,11 +135,12 @@ func (apiCFG *apiConfig) handlerMakeTransaction(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	respondWithJSON(w, http.StatusCreated, transaction)
+	respondWithJSON(w, http.StatusCreated, dbTransactionToTransaction(transaction))
 
 }
 
-// handlerGetNLastTransactions handles a GET  /api/transactions?count=N endpoint
+// handlerGetNLastTransactions handles a GET  /api/transactions?count=N endpoint.
+// Returns json array of last N transactions as a response
 func (apiCFG *apiConfig) handlerGetNLastTransactions(w http.ResponseWriter, r *http.Request) {
 	// parsing count from query string
 	countStr := r.URL.Query().Get("count")
@@ -152,5 +155,5 @@ func (apiCFG *apiConfig) handlerGetNLastTransactions(w http.ResponseWriter, r *h
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, transactions)
+	respondWithJSON(w, http.StatusOK, dbTransactionsToTransactions(transactions))
 }
