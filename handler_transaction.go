@@ -6,6 +6,7 @@ import (
 	"infotecs_go/internal/database"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -39,6 +40,17 @@ func (apiCFG *apiConfig) handlerMakeTransaction(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	// check if amount has more than 2 decimal places
+	if strings.Contains(params.Amount, ".") {
+		decimalPart := strings.Split(params.Amount, ".")[1]
+		if len := len(decimalPart); len > 2 {
+			respondWithError(w, http.StatusBadRequest,
+				fmt.Sprintf("Amount can have maximum 2 decimal places, your input has %v in .%v", len, decimalPart),
+			)
+			return
+		}
+	}
+
 	// check if amount < minimalTransactionAmount
 	amount, err := decimal.NewFromString(params.Amount)
 	if err != nil {
@@ -47,7 +59,7 @@ func (apiCFG *apiConfig) handlerMakeTransaction(w http.ResponseWriter, r *http.R
 	}
 	if amount.LessThan(apiCFG.minimalTransactionAmount) {
 		respondWithError(w, http.StatusBadRequest,
-			fmt.Sprintf("Amout value is too small: minimum value is %v, your amount %v", apiCFG.minimalTransactionAmount, amount),
+			fmt.Sprintf("Amout value is too small: minimum value is %v, your amount is %v", apiCFG.minimalTransactionAmount, amount),
 		)
 		return
 	}
