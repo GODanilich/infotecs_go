@@ -178,7 +178,7 @@ go build && ./infotecs_go
 
 
 
-# ENG [GODanilich/Infotecs_go](https://github.com/GODanilich/infotecs_go)
+# ENG [GODanilich/Infotecs_go](https://github.com/GODanilich/infotecs_go?tab=readme-ov-file#eng-godanilichinfotecs_go)
 
 ## What is this?
 
