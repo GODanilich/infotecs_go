@@ -67,7 +67,7 @@ func (apiCFG *apiConfig) handlerMakeTransaction(w http.ResponseWriter, r *http.R
 	// check if sender balance < amount
 	balanceStr, err := apiCFG.DB.GetWalletBalance(r.Context(), params.From)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Couldn`t find wallet: %v", err))
+		respondWithError(w, http.StatusNotFound, fmt.Sprintf("Couldn`t find sender`s wallet: %v", err))
 		return
 	}
 	balance, err := decimal.NewFromString(balanceStr)
@@ -83,7 +83,7 @@ func (apiCFG *apiConfig) handlerMakeTransaction(w http.ResponseWriter, r *http.R
 	// getting recipient balance
 	recipientBalanceStr, err := apiCFG.DB.GetWalletBalance(r.Context(), params.To)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Couldn`t find wallet: %v", err))
+		respondWithError(w, http.StatusNotFound, fmt.Sprintf("Couldn`t find recipient`s wallet: %v", err))
 		return
 	}
 
