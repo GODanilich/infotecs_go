@@ -167,5 +167,10 @@ func (apiCFG *apiConfig) handlerGetNLastTransactions(w http.ResponseWriter, r *h
 		return
 	}
 
+	if len(transactions) == 0 {
+		respondWithError(w, http.StatusNotFound, "No transactions found")
+		return
+	}
+
 	respondWithJSON(w, http.StatusOK, dbTransactionsToTransactions(transactions))
 }
