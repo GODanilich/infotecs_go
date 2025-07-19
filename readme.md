@@ -1,4 +1,4 @@
-# RUS GODanilich/Infotecs_go
+# RUS [GODanilich/Infotecs_go](https://github.com/GODanilich/infotecs_go)
 
 ## Что это?
 
@@ -178,7 +178,7 @@ go build && ./infotecs_go
 
 
 
-# ENG GODanilich/Infotecs_go
+# ENG [GODanilich/Infotecs_go](https://github.com/GODanilich/infotecs_go)
 
 ## What is this?
 
